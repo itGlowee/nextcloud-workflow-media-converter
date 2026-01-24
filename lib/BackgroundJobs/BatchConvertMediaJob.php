@@ -126,14 +126,44 @@ class BatchConvertMediaJob extends QueuedJob {
 				? $this->postConversionOutputRuleMoveFolder . '/' . $possibleOutputFilename
 				: $folder->getPath() . '/' . $possibleOutputFilename;
 
-			// TODO: Take into account if postConversionSourceRuleMoveFolder is set and stuff.
+			$ok = false;
+			// TODO: Clean this up
+			switch ($this->postConversionSourceRule) {
+				case 'keep':
+					// check if output file exists
+					$ok = !$this->rootFolder->nodeExists($outputFile);
+					break;
+				case 'move':
+					if ($this->postConversionOutputRule === 'move') {
+						$ok = true; // TODO: Handle move to new folder properly
+					}
+					elseif ($this->postConversionOutputRule === 'keep') {
+						// source moves out of the way so output can take its place
+						$ok = true;
+					}
+					else {
+						$ok = false;
+					}
+					break;
+				case 'delete':
+					if ($this->postConversionOutputRule === 'keep') {
+						$ok = true;
+					} else {
+						$ok = !$this->rootFolder->nodeExists($outputFile);
+					}
+					break;
+				default:
+					$this->logger->warning('Skipping conversion due to unknown postConversionSourceRule for: ' . $outputFile);
+					// Only convert if output file does not exist
+					break;
+			}
 
-			if (!$this->rootFolder->nodeExists($outputFile)) {
-				//$this->logger->info('Queuing file for conversion: ' . $node->getPath());
+			if ($ok) {
+				$this->logger->info('Queuing file for conversion: ' . $node->getPath());
 				$this->unconvertedMedia[] = $node;
 			}
 			else {
-				//$this->logger->info('Skipping conversion for existing file: ' . $outputFile);
+				$this->logger->info('Skipping conversion for existing file: ' . $outputFile);
 			}
 		}
 
