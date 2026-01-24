@@ -122,8 +122,18 @@ class BatchConvertMediaJob extends QueuedJob {
 			$filenameNoExtension = str_replace(".{$extension}", '', $filename);
 			$possibleOutputFilename = $filenameNoExtension . ".{$this->outputExtension}";
 
-			if (!$folder->nodeExists($possibleOutputFilename)) {
+			$outputFile = $this->postConversionOutputRuleMoveFolder
+				? $this->postConversionOutputRuleMoveFolder . '/' . $possibleOutputFilename
+				: $folder->getPath() . '/' . $possibleOutputFilename;
+
+			// TODO: Take into account if postConversionSourceRuleMoveFolder is set and stuff.
+
+			if (!$this->rootFolder->nodeExists($outputFile)) {
+				//$this->logger->info('Queuing file for conversion: ' . $node->getPath());
 				$this->unconvertedMedia[] = $node;
+			}
+			else {
+				//$this->logger->info('Skipping conversion for existing file: ' . $outputFile);
 			}
 		}
 
