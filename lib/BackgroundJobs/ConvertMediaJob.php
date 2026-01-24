@@ -10,6 +10,8 @@ use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\BackgroundJob\IJobList;
 use OCP\BackgroundJob\QueuedJob;
 use OCP\Files\IRootFolder;
+use OCP\SystemTag\ISystemTagManager;
+use OCP\SystemTag\ISystemTagObjectMapper;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Process\Exception\ProcessFailedException;
 
@@ -49,8 +51,11 @@ class ConvertMediaJob extends QueuedJob {
 	private $tempOutputFilename;
 	private $outputFileName;
 	private $outputFolder;
+	private $tagOutputFiles;
+	private ISystemTagManager $tagManager;
+	private ISystemTagObjectMapper $objectMapper;
 
-	public function __construct(ITimeFactory $time, LoggerInterface $logger, IRootFolder $rootFolder, ConfigService $configService, ViewFactory $viewFactory, ProcessFactory $processFactory, IJobList $jobList) {
+	public function __construct(ITimeFactory $time, LoggerInterface $logger, IRootFolder $rootFolder, ConfigService $configService, ViewFactory $viewFactory, ProcessFactory $processFactory, IJobList $jobList, ISystemTagManager $tagManager, ISystemTagObjectMapper $objectMapper) {
 		parent::__construct($time);
 		$this->rootFolder = $rootFolder;
 		$this->logger = $logger;
@@ -58,6 +63,8 @@ class ConvertMediaJob extends QueuedJob {
 		$this->viewFactory = $viewFactory;
 		$this->processFactory = $processFactory;
 		$this->jobList = $jobList;
+		$this->tagManager = $tagManager;
+		$this->objectMapper = $objectMapper;
 	}
 
 	protected function run($arguments) {
@@ -109,6 +116,7 @@ class ConvertMediaJob extends QueuedJob {
 		$this->additionalConversionFlags = (string)($arguments['additionalConversionFlags'] ?? '');
 		$this->additionalInputConversionFlags = (string)($arguments['additionalInputConversionFlags'] ?? '');
 		$this->additionalOutputConversionFlags = (string)($arguments['additionalOutputConversionFlags'] ?? '');
+		$this->tagOutputFiles = isset($arguments['tagOutputFiles']) ? (bool)$arguments['tagOutputFiles'] : false;
 
 		$this->sourceFile = $this->rootFolder->get($this->path);
 		$this->sourceFolder = dirname($this->path);
@@ -153,6 +161,7 @@ class ConvertMediaJob extends QueuedJob {
 				'postConversionOutputConflictRule' => $this->postConversionOutputConflictRule,
 				'postConversionOutputConflictRuleMoveFolder' => $this->postConversionOutputConflictRuleMoveFolder,
 				'postConversionTimestampRule' => $this->postConversionTimestampRule,
+				'tagOutputFiles' => $this->tagOutputFiles,
 			]);
 
 			throw new MediaConversionLockedException();
@@ -259,12 +268,25 @@ class ConvertMediaJob extends QueuedJob {
 		}
 
 		$newFileName = $this->writeFileSafe($this->outputFolder, $this->tempOutputPath, $this->outputFileName);
+		$newFile = $this->outputFolder->get($newFileName);
 
 		if ($this->postConversionTimestampRule === 'preserveSource') {
 			$view = $this->viewFactory->create($this->outputFolder->getPath());
-			$newFile = $this->outputFolder->get($newFileName);
 			$view->touch($newFile->getPath(), $this->sourceFile->getMtime());
 			$newFile->touch($this->sourceFile->getMtime());
+		}
+
+		if ($this->tagOutputFiles) {
+			$systemTagManager = $this->tagManager;
+			$systemTagObjectMapper = $this->objectMapper;
+			try {
+				$tag = $systemTagManager->getTag('Converted by Media Converter', true, false);
+			}
+			catch (\Exception $e) {
+				$tag = $systemTagManager->createTag('Converted by Media Converter', true, false);
+			}
+			// TODO: Where does 'files' come from?
+			$systemTagObjectMapper->assignTags($newFile->getId(), 'files', [$tag->getId()]);
 		}
 
 		return $this;

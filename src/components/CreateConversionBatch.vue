@@ -57,6 +57,11 @@
 						</option>
 					</select>
 				</div>
+				<div class="wmc-conversion-batch__info">
+					<NcCheckboxRadioSwitch :checked.sync="tagOutputFiles">
+						{{ t('workflow_media_converter', 'Tag output files') }}
+					</NcCheckboxRadioSwitch>
+				</div>
 			</div>
 			<div class="column">
 				<PostConversionRules v-model="postConversionRules" />
@@ -135,6 +140,14 @@ export default {
 			},
 			set(convertMediaInSubFolders) {
 				this.commit({ convertMediaInSubFolders })
+			},
+		},
+		tagOutputFiles: {
+			get() {
+				return this.conversionBatch.tagOutputFiles
+			},
+			set(tagOutputFiles) {
+				this.commit({ tagOutputFiles })
 			},
 		},
 		sourceExtension: {

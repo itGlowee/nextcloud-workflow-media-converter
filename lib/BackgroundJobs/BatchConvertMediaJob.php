@@ -19,6 +19,7 @@ class BatchConvertMediaJob extends QueuedJob {
 	private $batchId;
 	private $userFolder;
 	private $convertMediaInSubFolders;
+	private $tagOutputFiles;
 	private $userId;
 	private $sourceFolderPath;
 	private $sourceExtension;
@@ -87,6 +88,7 @@ class BatchConvertMediaJob extends QueuedJob {
 		$this->additionalOutputConversionFlags = (string)($arguments['additionalOutputConversionFlags'] ?? '');
 		$this->sourceFolderPath = $this->prependUserFolder($arguments['sourceFolder']);
 		$this->convertMediaInSubFolders = $arguments['convertMediaInSubFolders'];
+		$this->tagOutputFiles = $arguments['tagOutputFiles'];
 		$this->sourceExtension = strtolower($arguments['sourceExtension']);
 		$this->outputExtension = strtolower($arguments['outputExtension']);
 		$this->postConversionSourceRule = $arguments['postConversionSourceRule'];
@@ -197,6 +199,7 @@ class BatchConvertMediaJob extends QueuedJob {
 				'postConversionOutputConflictRule' => $this->postConversionOutputConflictRule,
 				'postConversionOutputConflictRuleMoveFolder' => $this->postConversionOutputConflictRuleMoveFolder,
 				'postConversionTimestampRule' => $this->postConversionTimestampRule,
+				'tagOutputFiles' => $this->tagOutputFiles,
 			]);
 		}
 
