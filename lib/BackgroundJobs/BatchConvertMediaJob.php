@@ -140,8 +140,8 @@ class BatchConvertMediaJob extends QueuedJob {
 						$ok = true; // TODO: Handle move to new folder properly
 					}
 					elseif ($this->postConversionOutputRule === 'keep') {
-						// source moves out of the way so output can take its place
-						$ok = true;
+						// If the source file already exists in the move folder, it has been converted previously.
+						$ok = !$this->rootFolder->nodeExists($this->postConversionSourceRuleMoveFolder . '/' . $possibleOutputFilename);
 					}
 					else {
 						$ok = false;
