@@ -3,6 +3,7 @@
 namespace OCA\WorkflowMediaConverter\BackgroundJobs;
 
 use OCA\WorkflowMediaConverter\Service\ConfigService;
+use OCA\WorkflowMediaConverter\Service\ConversionValidationService;
 use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\BackgroundJob\IJobList;
 use OCP\BackgroundJob\QueuedJob;
@@ -34,6 +35,7 @@ class BatchConvertMediaJob extends QueuedJob {
 	private $postConversionOutputRuleMoveFolder;
 	private $postConversionOutputConflictRule;
 	private $postConversionOutputConflictRuleMoveFolder;
+	private $validationService;
 
 	public $unconvertedMedia = [];
 
@@ -43,12 +45,14 @@ class BatchConvertMediaJob extends QueuedJob {
 		IRootFolder $rootFolder,
 		IJobList $jobList,
 		ConfigService $configService,
+		ConversionValidationService $validationService,
 	) {
 		parent::__construct($time);
 		$this->logger = $logger;
 		$this->rootFolder = $rootFolder;
 		$this->jobList = $jobList;
 		$this->configService = $configService;
+		$this->validationService = $validationService;
 	}
 
 	public function run($arguments) {
@@ -126,44 +130,23 @@ class BatchConvertMediaJob extends QueuedJob {
 				? $this->postConversionOutputRuleMoveFolder . '/' . $possibleOutputFilename
 				: $folder->getPath() . '/' . $possibleOutputFilename;
 
-			$ok = false;
-			// TODO: Clean this up
-			switch ($this->postConversionSourceRule) {
-				case 'keep':
-					// check if output file exists
-					$ok = !$this->rootFolder->nodeExists($outputFile);
-					break;
-				case 'move':
-					if ($this->postConversionOutputRule === 'move') {
-						$ok = true; // TODO: Handle move to new folder properly
-					}
-					elseif ($this->postConversionOutputRule === 'keep') {
-						// If the source file already exists in the move folder, it has been converted previously.
-						$ok = !$this->rootFolder->nodeExists($this->postConversionSourceRuleMoveFolder . '/' . $possibleOutputFilename);
-					}
-					else {
-						$ok = false;
-					}
-					break;
-				case 'delete':
-					if ($this->postConversionOutputRule === 'keep') {
-						$ok = true;
-					} else {
-						$ok = !$this->rootFolder->nodeExists($outputFile);
-					}
-					break;
-				default:
-					$this->logger->warning('Skipping conversion due to unknown postConversionSourceRule for: ' . $outputFile);
-					// Only convert if output file does not exist
-					break;
-			}
+			// Use validation service to check if conversion should happen
+			$validation = $this->validationService->shouldConvertFile(
+				$node,
+				$this->outputExtension,
+				$this->postConversionSourceRule,
+				$this->postConversionSourceRuleMoveFolder,
+				$this->postConversionOutputRule,
+				$this->postConversionOutputRuleMoveFolder,
+				$this->postConversionOutputConflictRule,
+				$this->postConversionOutputConflictRuleMoveFolder
+			);
 
-			if ($ok) {
+			if ($validation['shouldConvert']) {
 				$this->logger->info('Queuing file for conversion: ' . $node->getPath());
 				$this->unconvertedMedia[] = $node;
-			}
-			else {
-				$this->logger->info('Skipping conversion for existing file: ' . $outputFile);
+			} else {
+				$this->logger->info("Skipping conversion: {$validation['reason']} for file: {$outputFile}");
 			}
 		}
 
