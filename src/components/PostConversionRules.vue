@@ -76,6 +76,12 @@
 				</option>
 			</select>
 		</div>
+		<div>
+			<label>
+				{{ t('workflow_media_converter', 'Tag output files') }}
+			</label>
+			<input v-model="tagOutputFiles" type="checkbox">
+		</div>
 	</div>
 </template>
 
@@ -201,7 +207,16 @@ export default {
 			set(postConversionTimestampRule) {
 				this.$emit('input', { postConversionTimestampRule })
 			},
-		}
+		},
+
+		tagOutputFiles: {
+			get() {
+				return this.value.tagOutputFiles
+			},
+			set(tagOutputFiles) {
+				this.$emit('input', { tagOutputFiles })
+			},
+		},
 	},
 }
 </script>

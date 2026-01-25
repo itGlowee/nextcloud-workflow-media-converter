@@ -45,7 +45,8 @@ const defaultState = {
 	postConversionOutputRuleMoveFolder: null,
 	postConversionOutputConflictRule: 'preserve',
 	postConversionOutputConflictRuleMoveFolder: null,
-	postConversionTimestampRule: 'conversionTime'
+	postConversionTimestampRule: 'conversionTime',
+	tagOutputFiles: false
 };
 
 export default {
@@ -65,6 +66,7 @@ export default {
 	data: () => ({
 		formats,
 		threads: 0,
+		localTagOutputFiles: false,
 	}),
 
 	computed: {
@@ -77,9 +79,15 @@ export default {
 				}
 			},
 			set(mutation) {
+				let currentConfig = defaultState
+				try {
+					currentConfig = this.value ? JSON.parse(this.value) : defaultState
+				} catch {
+					currentConfig = defaultState
+				}
 				this.$emit(
 					'input',
-					JSON.stringify({ ...(this.config || {}), ...mutation }),
+					JSON.stringify({ ...currentConfig, ...mutation }),
 				)
 			},
 		},
@@ -89,6 +97,7 @@ export default {
 				return this.config.outputExtension
 			},
 			set(outputExtension) {
+				console.log("setting outputExtension to ", outputExtension);
 				this.config = { outputExtension }
 			},
 		},
@@ -123,7 +132,21 @@ export default {
 		},
 	},
 
+	watch: {
+		localTagOutputFiles(newVal) {
+			console.log("localTagOutputFiles changed to", newVal);
+			this.config = { tagOutputFiles: newVal }
+		},
+		'config.tagOutputFiles'(newVal) {
+			if (this.localTagOutputFiles !== newVal) {
+				this.localTagOutputFiles = newVal
+			}
+		},
+	},
+
 	async mounted() {
+		// Initialize local data from config
+		this.localTagOutputFiles = this.config.tagOutputFiles || false
 		const { data } = await axios.get(generateControllerUrl('admin-settings'))
 
 		this.threads = data.threadLimit
