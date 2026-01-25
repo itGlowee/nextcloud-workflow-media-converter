@@ -5,6 +5,7 @@ namespace OCA\WorkflowMediaConverter\Operation;
 use OCA\WorkflowEngine\Entity\File;
 use OCA\WorkflowMediaConverter\AppInfo\Application;
 use OCA\WorkflowMediaConverter\BackgroundJobs\ConvertMediaJob;
+use OCA\WorkflowMediaConverter\Service\ConversionValidationService;
 use OCP\BackgroundJob\IJobList;
 use OCP\EventDispatcher\Event;
 use OCP\Files\Folder;
@@ -23,6 +24,7 @@ class ConvertMediaOperation implements ISpecificOperation {
 		private LoggerInterface $logger,
 		private IRootFolder $rootFolder,
 		private IL10N $l,
+		private ConversionValidationService $validationService,
 	) {
 	}
 
@@ -128,8 +130,21 @@ class ConvertMediaOperation implements ISpecificOperation {
 				break;
 			}
 
-			if (empty($outputExtension) || empty($postConversionSourceRule) || empty($postConversionOutputRule)) {
-				return;
+			// Validate if this file should be converted
+			$validation = $this->validationService->shouldConvertFile(
+				$node,
+				$outputExtension,
+				$postConversionSourceRule,
+				$postConversionSourceRuleMoveFolder,
+				$postConversionOutputRule,
+				$postConversionOutputRuleMoveFolder,
+				$postConversionOutputConflictRule,
+				$postConversionOutputConflictRuleMoveFolder
+			);
+
+			if (!$validation['shouldConvert']) {
+				$this->logger->info("Skipping conversion: {$validation['reason']}", ['path' => $path]);
+				continue;
 			}
 
 			$this->jobList->add(ConvertMediaJob::class, [
