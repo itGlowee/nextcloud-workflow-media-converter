@@ -74,11 +74,29 @@ class ConvertMediaOperation implements ISpecificOperation {
 
 			$node = $node[0];
 		} elseif ($event instanceof \OCP\EventDispatcher\GenericEvent) {
-			if ($event->getSubject() instanceof \OC\Files\Node\File) {
-				$node = $event->getSubject();
-			} else {
+			// Only handle file-related events
+			$validFileEvents = ['\OCP\Files::postRename', '\OCP\Files::postCreate', '\OCP\Files::postWrite', '\OCP\Files::postCopy'];
+			if (!in_array($eventName, $validFileEvents)) {
+				$this->logger->debug("GenericEvent '{$eventName}' is not a supported file event");
 				return;
 			}
+
+			$subject = $event->getSubject();
+			// For rename/move events, subject is array [source, target] - use target (new file)
+			if (is_array($subject) && count($subject) === 2) {
+				$node = $subject[1]; // Use the target/new file for conversion
+			} elseif (is_array($subject) && isset($subject[0])) {
+				$node = $subject[0];
+			} elseif ($subject instanceof \OCP\Files\Node || $subject instanceof \OC\Files\Node\File) {
+				$node = $subject;
+			} else {
+				$subjectType = is_object($subject) ? get_class($subject) : gettype($subject);
+				$this->logger->debug("GenericEvent subject is not a file node: " . $subjectType);
+				return;
+			}
+		} else {
+			$this->logger->debug("Unknown event type: " . get_class($event));
+			return;
 		}
 
 		$path = $node->getPath();
